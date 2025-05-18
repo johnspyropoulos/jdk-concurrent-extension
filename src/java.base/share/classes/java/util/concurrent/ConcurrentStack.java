@@ -19,8 +19,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ConcurrentStack<E> extends AbstractCollection<E> {
 
     private static final class Node<E> {
-        private final E item;
-        private Node<E> down;
+        final E item;
+        Node<E> down;
 
         public Node(E item) {
             this.item = item;
