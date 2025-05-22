@@ -9,10 +9,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A general-purpose LIFO (Last-In-First-Out) data structure that fully supports concurrent operations.
- *
+ * A thread-safe, non-blocking stack implementation based on atomic operations.
  * <p>
- * This implementation is thread-safe and lock-free.
+ * This stack uses a Treiber stack structure with an {@link AtomicReference} to ensure
+ * lock-free, LIFO (last-in-first-out) access. It supports concurrent push and pop operations
+ * from multiple threads without requiring explicit synchronization.
+ * </p>
  *
  * @param <E> the type of elements held in this stack
  */
@@ -32,16 +34,20 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     private AtomicInteger totalItems = new AtomicInteger(0);
 
     /**
-     * Constructs an empty {@code ConcurrentStack}
+     * Constructs an empty {@code ConcurrentStack}.
      */
     public ConcurrentStack() {}
 
     /**
-     * Pushes an item onto the top of the stack.
+     * Pushes an element onto the top of this stack.
      *
-     * @param item the element to be added
+     * @param item the element to push
+     * @throws NullPointerException if the specified element is {@code null}
      */
     public void push(E item) {
+        if (item == null)
+            throw new NullPointerException("item cannot be null");
+
         Node<E> oldTop;
         final Node<E> newTop = new Node<E>(item);
 
@@ -54,9 +60,10 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Removes the top item of the stack
-     * 
-     * @return the removed item
+     * Removes and returns the element at the top of the stack.
+     *
+     * @return the element removed from the top of the stack
+     * @throws EmptyStackException if the stack is empty
      */
     public E pop() {
         Node<E> oldTop;
@@ -77,20 +84,19 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Gets the item at the top of the stack
-     * 
-     * @return item at the top of the stack
+     * Retrieves, but does not remove, the element at the top of the stack.
+     *
+     * @return the element at the top of the stack
+     * @throws EmptyStackException if the stack is empty
      */
     public E peek() {
         return top.get().item;
     }
 
     /**
-     * Returns the total amount of items in the stack.
-     * <p>
-     * Note that it may by slightly innacurate during contention
-     * 
-     * @return an integer that represents the total items in the stack (approximate)
+     * Returns the number of elements in the stack.
+     *
+     * @return the number of elements in this stack
      */
     @Override
     public int size() {
@@ -98,7 +104,8 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Removes all items from the stack
+     * Removes all of the elements from this stack.
+     * The stack will be empty after this call returns.
      */
     @Override
     public void clear() {
@@ -107,9 +114,11 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * {@code push} synonym
-     * 
-     * @param item item to push
+     * Adds an element to the stack. This is equivalent to {@link #push(Object)}.
+     *
+     * @param item the element to add
+     * @return {@code true} (as specified by {@link java.util.Collection#add})
+     * @throws NullPointerException if the specified element is {@code null}
      */
     @Override
     public boolean add(E item) {
@@ -118,9 +127,11 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Unsupported operation
-     * 
-     * @throws UnsupportedOperationException when called
+     * Not supported. This stack does not support arbitrary element removal.
+     *
+     * @param o the object to be removed
+     * @return never returns normally
+     * @throws UnsupportedOperationException always
      */
     @Override
     public boolean remove(Object o) {
@@ -128,9 +139,11 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Unsupported operation
-     * 
-     * @throws UnsupportedOperationException when called
+     * Not supported. This stack does not support bulk removal operations.
+     *
+     * @param c the collection containing elements to be removed from this stack
+     * @return never returns normally
+     * @throws UnsupportedOperationException always
      */
     @Override
     public boolean removeAll(Collection<?> c) {
@@ -138,9 +151,11 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Unsupported operation
-     * 
-     * @throws UnsupportedOperationException when called
+     * Not supported. This stack does not support bulk retention operations.
+     *
+     * @param c the collection containing elements to be retained in this stack
+     * @return never returns normally
+     * @throws UnsupportedOperationException always
      */
     @Override
     public boolean retainAll(Collection<?> c) {
@@ -148,15 +163,13 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
     }
 
     /**
-     * Returns an iterator over the elements in this stack in LIFO (last-in-first-out) order.
+     * Returns an iterator over the elements in this stack in LIFO order.
      * <p>
-     * The iterator provides a weakly consistent view of the stack, meaning it reflects some 
-     * state of the stack at or since the creation of the iterator. It does not throw 
-     * {@link java.util.ConcurrentModificationException} if the stack is modified concurrently.
-     * <p>
-     * The returned iterator does not support element removal.
+     * The iterator is weakly consistent and does not throw {@link java.util.ConcurrentModificationException}.
+     * It reflects the state of the stack at some point during or after the creation of the iterator.
+     * </p>
      *
-     * @return an iterator over the elements in this stack, starting from the top
+     * @return an iterator over the elements in this stack
      */
     @Override
     public Iterator<E> iterator() {
