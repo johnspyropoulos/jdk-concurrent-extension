@@ -2,7 +2,6 @@ package java.util.concurrent;
 
 import java.util.AbstractCollection;
 import java.util.Collection;
-import java.util.EmptyStackException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,9 +28,11 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
         }
     }
 
-    private AtomicReference<Node<E>> top = new AtomicReference<>(null);
+    private static final int MAX_BACKOFF = 128;
 
-    private AtomicInteger totalItems = new AtomicInteger(0);
+    private final AtomicReference<Node<E>> top = new AtomicReference<>(null);
+
+    private final AtomicInteger totalItems = new AtomicInteger(0);
 
     /**
      * Constructs an empty {@code ConcurrentStack}.
@@ -48,49 +49,64 @@ public class ConcurrentStack<E> extends AbstractCollection<E> {
         if (item == null)
             throw new NullPointerException("item cannot be null");
 
-        Node<E> oldTop;
-        final Node<E> newTop = new Node<E>(item);
-
-        do {
-            oldTop = top.get();
+        Node<E> newTop = new Node<>(item);
+        int backoff = 1;
+        
+        while (true) {
+            Node<E> oldTop = top.get();
             newTop.down = oldTop;
-        } while (!top.compareAndSet(oldTop, newTop));
-
-        totalItems.incrementAndGet();
+            
+            if (top.compareAndSet(oldTop, newTop)) {
+                totalItems.incrementAndGet();
+                return;
+            }
+            
+            // Exponential backoff
+            for (int i = 0; i < backoff; i++)
+                Thread.onSpinWait();
+            
+            backoff = Math.min(backoff * 2, MAX_BACKOFF);
+        }
     }
 
     /**
      * Removes and returns the element at the top of the stack.
      *
-     * @return the element removed from the top of the stack
-     * @throws EmptyStackException if the stack is empty
+     * @return the element removed from the top of the stack, or
+     *         null if the stack is empty
      */
     public E pop() {
-        Node<E> oldTop;
-        Node<E> newTop;
+        int backoff = 1;
 
-        do {
-            oldTop = top.get();
+        while (true) {
+            Node<E> oldTop = top.get();
 
             if (oldTop == null)
-                throw new EmptyStackException();
+                return null;
 
-            newTop = oldTop.down;
-        } while (!top.compareAndSet(oldTop, newTop));
+            Node<E> newTop = oldTop.down;
 
-        totalItems.decrementAndGet();
+            if (top.compareAndSet(oldTop, newTop)) {
+                totalItems.decrementAndGet();
+                return oldTop.item;
+            }
 
-        return oldTop.item;
+            // Exponential backoff
+            for (int i = 0; i < backoff; i++)
+                Thread.onSpinWait();
+            
+            backoff = Math.min(backoff * 2, MAX_BACKOFF);
+        }
     }
 
     /**
      * Retrieves, but does not remove, the element at the top of the stack.
      *
-     * @return the element at the top of the stack
-     * @throws EmptyStackException if the stack is empty
+     * @return the element at the top of the stack, or null if the stack is empty
      */
     public E peek() {
-        return top.get().item;
+        Node<E> currentTop = top.get();
+        return currentTop != null ? currentTop.item : null;
     }
 
     /**
