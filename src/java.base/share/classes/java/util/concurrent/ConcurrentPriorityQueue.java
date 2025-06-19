@@ -87,8 +87,8 @@ public class ConcurrentPriorityQueue<E> extends AbstractQueue<E> {
                     // If the node is marked for delete, attempt to unlink it from the list.
                     // If unlinking fails, do nothing. If it failed because another thread
                     // unlinked it first, then removal is done. If it failed because a node
-                    // that is the direct predecessor of the marked node, it should be handled
-                    // later, as these cases can't be distinguished.
+                    // that is the direct predecessor of the marked node was inserted, it
+                    // should be handled later, as these cases can't be distinguished.
                     if (curr.markedForDelete.get() == true)
                         pred.next[level].compareAndSet(curr, curr.next[level].get());
                     else
